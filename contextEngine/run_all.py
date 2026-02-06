@@ -2,11 +2,22 @@ from engine.load_all_data import load_all
 from engine.base_engine import run_base_engine
 import json
 
-def run_for_all():
+
+def run_for_all(test_content_ids=None):
+    """
+    If test_content_ids is provided (list),
+    only those content_ids will be processed.
+    """
     data = load_all()
     results = []
 
-    for content_id in data["performance"].keys():
+    all_content_ids = data["performance"].keys()
+
+    for content_id in all_content_ids:
+        # --- TEST MODE FILTER ---
+        if test_content_ids and content_id not in test_content_ids:
+            continue
+
         try:
             output = run_base_engine(content_id, data)
             results.append(output)
@@ -17,7 +28,11 @@ def run_for_all():
 
 
 if __name__ == "__main__":
-    engine_outputs = run_for_all()
+    # 👇 CHANGE THIS LIST TO TEST FEW CONTENTS
+    TEST_CONTENT_IDS = ["cnt_001", "cnt_002"]
+    # TEST_CONTENT_IDS = None  # ← uncomment this to run ALL later
+
+    engine_outputs = run_for_all(TEST_CONTENT_IDS)
 
     with open("outputs/base_engine_outputs.json", "w") as f:
         json.dump(engine_outputs, f, indent=2)
