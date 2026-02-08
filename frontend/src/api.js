@@ -6,18 +6,24 @@ export async function fetchLinks() {
   return res.json();
 }
 
-export async function analyzeLink(link) {
+export async function fetchContentByLink(link) {
   const res = await fetch(`${API_BASE}/analyze/link`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ link }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ link })
   });
 
-  if (!res.ok) {
-    throw new Error("Analysis failed");
-  }
+  if (!res.ok) throw new Error("Failed to fetch content");
+  return res.json();
+}
 
+export async function analyzeRaw(signals) {
+  const res = await fetch(`${API_BASE}/analyze/raw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(signals)
+  });
+
+  if (!res.ok) throw new Error("Analysis failed");
   return res.json();
 }
