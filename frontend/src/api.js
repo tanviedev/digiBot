@@ -7,7 +7,7 @@ export async function fetchLinks() {
 }
 
 export async function fetchContentByLink(link) {
-  const res = await fetch(`${API_BASE}/analyze/link`, {
+  const res = await fetch(`${API_BASE}/content/link`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ link })

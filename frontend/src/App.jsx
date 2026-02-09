@@ -1,162 +1,241 @@
-import "./App.css";
 import { useEffect, useState } from "react";
-import {
-  fetchLinks,
-  fetchContentByLink,
-  analyzeRaw
-} from "./api";
-
+import { fetchLinks, fetchContentByLink, analyzeRaw } from "./api";
 import EngagementChart from "./components/EngagementChart";
 import MomentumChart from "./components/MomentumChart";
-import InsightCard from "./components/InsightCard";
+import "./App.css";
 
 export default function App() {
   const [links, setLinks] = useState([]);
   const [selectedLink, setSelectedLink] = useState("");
   const [signals, setSignals] = useState(null);
-  const [insight, setInsight] = useState(null);
+  const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  /* ---------------- FETCH LINKS ---------------- */
   useEffect(() => {
-    fetchLinks().then(d => setLinks(d.links || []));
+    fetchLinks()
+      .then((data) => setLinks(data.links))
+      .catch(console.error);
   }, []);
 
-  async function loadSignals(link) {
-    setInsight(null);
-    const data = await fetchContentByLink(link);
-    setSignals(data);
+  /* ---------------- FETCH SIGNALS BY LINK ---------------- */
+  async function handleLinkSelect(link) {
+    setSelectedLink(link);
+    setInsights(null);
+    setSignals(null);
+
+    if (!link) return;
+
+    try {
+      const content = await fetchContentByLink(link);
+      setSignals(content);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
-  function update(path, value) {
-    setSignals(prev => {
-      const next = structuredClone(prev);
-      let ref = next;
-      path.slice(0, -1).forEach(k => (ref = ref[k]));
-      ref[path.at(-1)] = value;
-      return next;
-    });
-  }
-
-  async function analyze() {
+  /* ---------------- ANALYZE RAW SIGNALS ---------------- */
+  async function handleAnalyze() {
+    if (!signals) return;
     setLoading(true);
-    const res = await analyzeRaw(signals);
-    setInsight(res.llm_insight);
-    setLoading(false);
+    try {
+      const result = await analyzeRaw(signals);
+      setInsights(result);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  /* ---------------- SAFE UPDATE HELPERS ---------------- */
+  const updateField = (key, value) =>
+    setSignals((prev) => ({ ...prev, [key]: value }));
+
+  const updateNested = (parent, key, value) =>
+    setSignals((prev) => ({
+      ...prev,
+      [parent]: {
+        ...prev[parent],
+        [key]: value
+      }
+    }));
 
   return (
-    <div className="app">
-      <header>
-        <h1>Content Insight Engine</h1>
-        <p>Edit signals → Generate AI insight → Understand performance</p>
-      </header>
+    <div className="app-container">
+      <h1>Content Signal Intelligence</h1>
 
-      <select
-        value={selectedLink}
-        onChange={e => {
-          setSelectedLink(e.target.value);
-          loadSignals(e.target.value);
-        }}
-      >
-        <option value="">Select content link</option>
-        {links.map(l => (
-          <option key={l}>{l}</option>
-        ))}
-      </select>
+      {/* ---------------- LINK SELECT ---------------- */}
+      <div className="card">
+        <label>Select Content Link</label>
+        <select value={selectedLink} onChange={(e) => handleLinkSelect(e.target.value)}>
+          <option value="">-- Select --</option>
+          {links.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </div>
 
+      {/* ---------------- SIGNALS EDITOR ---------------- */}
       {signals && (
-        <section className="editor">
-          <h2>Signal Editor</h2>
+        <div className="card">
+          <h2>Performance Overview</h2>
 
-          <div className="grid">
-            <label>
-              Performance Status
-              <select
-                value={signals.performance_status}
-                onChange={e =>
-                  update(["performance_status"], e.target.value)
-                }
-              >
-                {["excellent", "good", "average", "poor", "underperforming"].map(v => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </label>
+          <label>Performance Status</label>
+          <input
+            value={signals.performance_status}
+            onChange={(e) => updateField("performance_status", e.target.value)}
+          />
 
-            <label>
-              Engagement Rate
-              <input
-                type="number"
-                step="0.001"
-                value={signals.engagement_profile.engagement_rate}
-                onChange={e =>
-                  update(["engagement_profile", "engagement_rate"], +e.target.value)
-                }
-              />
-            </label>
+          <h3>Engagement Profile</h3>
 
-            <label>
-              Retention Rate
-              <input
-                type="number"
-                step="0.001"
-                value={signals.engagement_profile.save_rate}
-                onChange={e =>
-                  update(["engagement_profile", "save_rate"], +e.target.value)
-                }
-              />
-            </label>
+          <label>Engagement Rate</label>
+          <input
+            type="number"
+            step="0.001"
+            value={signals.engagement_profile.engagement_rate}
+            onChange={(e) =>
+              updateNested("engagement_profile", "engagement_rate", +e.target.value)
+            }
+          />
 
-            <label>
-              Amplification Rate
-              <input
-                type="number"
-                step="0.001"
-                value={signals.engagement_profile.share_rate}
-                onChange={e =>
-                  update(["engagement_profile", "share_rate"], +e.target.value)
-                }
-              />
-            </label>
+          <label>Retention Rate</label>
+          <input
+            type="number"
+            step="0.001"
+            value={signals.engagement_profile.save_rate}
+            onChange={(e) =>
+              updateNested("engagement_profile", "save_rate", +e.target.value)
+            }
+          />
 
-            <label>
-              Primary Interaction
-              <select
-                value={signals.engagement_profile.dominant_engagement}
-                onChange={e =>
-                  update(["engagement_profile", "dominant_engagement"], e.target.value)
-                }
-              >
-                {["likes", "shares", "comments", "reposts", "saves"].map(v => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label>Amplification Rate</label>
+          <input
+            type="number"
+            step="0.001"
+            value={signals.engagement_profile.share_rate}
+            onChange={(e) =>
+              updateNested("engagement_profile", "share_rate", +e.target.value)
+            }
+          />
 
-          <button className="analyze-btn" onClick={analyze}>
-            {loading ? "Analyzing..." : "Generate AI Insight"}
-          </button>
-        </section>
+          <label>Primary Engagement Mode</label>
+          <select
+            value={signals.engagement_profile.dominant_engagement}
+            onChange={(e) =>
+              updateNested("engagement_profile", "dominant_engagement", e.target.value)
+            }
+          >
+            <option>likes</option>
+            <option>shares</option>
+            <option>comments</option>
+            <option>reposts</option>
+            <option>saves</option>
+          </select>
+
+          <h3>Content Evaluation</h3>
+
+          <label>Content Value Type</label>
+          <input
+            value={signals.content_value_type}
+            onChange={(e) => updateField("content_value_type", e.target.value)}
+          />
+
+          <label>Hook Strength</label>
+          <select
+            value={signals.hook_analysis.hook_strength}
+            onChange={(e) =>
+              updateNested("hook_analysis", "hook_strength", e.target.value)
+            }
+          >
+            <option>very strong</option>
+            <option>strong</option>
+            <option>average</option>
+            <option>weak</option>
+            <option>very weak</option>
+          </select>
+
+          <label>Audience Fatigue Level</label>
+          <select
+            value={signals.topic_health.fatigue_level}
+            onChange={(e) =>
+              updateNested("topic_health", "fatigue_level", e.target.value)
+            }
+          >
+            <option>fresh</option>
+            <option>low</option>
+            <option>medium</option>
+            <option>high</option>
+            <option>saturated</option>
+          </select>
+
+          <label>Audience Intent Alignment</label>
+          <select
+            value={signals.audience_alignment.intent_match}
+            onChange={(e) =>
+              updateNested("audience_alignment", "intent_match", e.target.value)
+            }
+          >
+            <option>strongly aligned</option>
+            <option>aligned</option>
+            <option>neutral</option>
+            <option>misaligned</option>
+            <option>conflicting</option>
+          </select>
+
+          <label>Timing Quality</label>
+          <select
+            value={signals.distribution_health.timing_quality}
+            onChange={(e) =>
+              updateNested("distribution_health", "timing_quality", e.target.value)
+            }
+          >
+            <option>excellent</option>
+            <option>good</option>
+            <option>average</option>
+            <option>poor</option>
+            <option>missed</option>
+          </select>
+
+          <label>Distribution Decay Pattern</label>
+          <select
+            value={signals.distribution_health.decay_pattern}
+            onChange={(e) =>
+              updateNested("distribution_health", "decay_pattern", e.target.value)
+            }
+          >
+            <option>viral spike</option>
+            <option>slow burn</option>
+            <option>steady</option>
+            <option>early drop</option>
+            <option>flat</option>
+          </select>
+        </div>
       )}
 
-      {insight && (
-        <>
-          <section className="insight">
-            <InsightCard title="Why it underperformed" value={insight.failure_reason} />
-            <InsightCard title="What worked" value={insight.success_driver} />
-            <InsightCard title="Recommended actions" list={insight.recommended_actions} />
-            <InsightCard
-              title="Confidence score"
-              value={`${Math.round(insight.confidence_score * 100)}%`}
-            />
-          </section>
+      {/* ---------------- ANALYZE BUTTON ---------------- */}
+      {signals && (
+        <button className="analyze-btn" onClick={handleAnalyze} disabled={loading}>
+          {loading ? "Analyzing..." : "Analyze Content"}
+        </button>
+      )}
 
-          <section className="charts">
-            <EngagementChart engagement={signals.engagement_profile} />
-            <MomentumChart engagement={signals.engagement_profile} />
-          </section>
-        </>
+      {/* ---------------- LLM INSIGHTS ---------------- */}
+      {insights && (
+        <div className="card">
+          <h2>LLM Insights</h2>
+          <pre>{JSON.stringify(insights, null, 2)}</pre>
+        </div>
+      )}
+
+      {/* ---------------- CHARTS ---------------- */}
+      {signals && insights && (
+        <div className="charts-grid">
+          <EngagementChart engagement={signals.engagement_profile} />
+          <MomentumChart engagement={signals.engagement_profile} />
+        </div>
       )}
     </div>
   );
