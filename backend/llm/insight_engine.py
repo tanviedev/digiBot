@@ -38,32 +38,19 @@ def generate_wording(base_output: dict) -> dict:
     system_prompt = load_prompt()
 
     messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        },
-        {
-            "role": "user",
-            "content": f"Signals:\n{json.dumps(signal, indent=2)}"
-        }
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Signals:\n{json.dumps(signal, indent=2)}"}
     ]
 
     payload = {
         "model": MODEL_NAME,
         "messages": messages,
         "stream": False,
-        "options": {
-            "temperature": 0.2,
-            "num_predict": 120
-        }
+        "options": {"temperature": 0.2, "num_predict": 120}
     }
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json=payload,
-            timeout=180
-        )
+        response = requests.post(OLLAMA_URL, json=payload, timeout=180)
         response.raise_for_status()
 
         raw = response.json()["message"]["content"]
@@ -80,13 +67,7 @@ def generate_wording(base_output: dict) -> dict:
                 "raw_llm_output": raw
             }
 
-        return {
-            "content_id": base_output["content_id"],
-            "llm_insight": parsed
-        }
+        return {"content_id": base_output["content_id"], "llm_insight": parsed}
 
     except Exception as e:
-        return {
-            "content_id": base_output["content_id"],
-            "error": str(e)
-        }
+        return {"content_id": base_output["content_id"], "error": str(e)}
