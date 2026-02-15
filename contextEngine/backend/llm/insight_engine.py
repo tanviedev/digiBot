@@ -1,27 +1,14 @@
-import requests
 import json
-from pathlib import Path
-
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "phi"  # stable + fast on CPU
-
-PROMPT_PATH = Path(__file__).parent / "prompt.txt"
-
-
-def load_prompt() -> str:
-    """Load system reasoning prompt from file"""
-    with open(PROMPT_PATH, "r", encoding="utf-8") as f:
-        return f.read()
-
+from llm.client import generate_response
 
 def generate_wording(base_output: dict) -> dict:
     """
     Takes base engine output and returns structured LLM insight.
-    Safe, deterministic, and beginner-proof.
+    Uses llm.client.generate_response instead of direct Ollama calls.
     """
 
     # --- Extract signal-level data only ---
-    signal = {
+    signals = {
         "performance_status": base_output["performance_status"],
         "engagement_rate": base_output["engagement_profile"]["engagement_rate"],
         "save_rate": base_output["engagement_profile"]["save_rate"],
@@ -35,49 +22,39 @@ def generate_wording(base_output: dict) -> dict:
         "decay_pattern": base_output["distribution_health"]["decay_pattern"]
     }
 
-    system_prompt = load_prompt()
+    # Optional: include reasoning if you have it in base_output
+    reasoning = base_output.get("reasoning", "")
 
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        },
-        {
-            "role": "user",
-            "content": f"Signals:\n{json.dumps(signal, indent=2)}"
-        }
-    ]
+    # Build prompt
+    prompt = f"""
+    Analyze these content signals:
+    {json.dumps(signals, indent=2)}
 
-    payload = {
-        "model": MODEL_NAME,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.2,
-            "num_predict": 120
-        }
-    }
+    Reasoning:
+    {reasoning}
+
+    Return JSON:
+    {{
+      "success_driver": "",
+      "failure_reason": "",
+      "recommendations": [],
+      "confidence_score": 0.0
+    }}
+    """
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json=payload,
-            timeout=180
-        )
-        response.raise_for_status()
-
-        raw = response.json()["message"]["content"]
+        response = generate_response(prompt)
 
         # --- Safe JSON parsing ---
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(response)
         except json.JSONDecodeError:
             parsed = {
                 "failure_reason": None,
                 "success_driver": None,
-                "recommended_actions": [],
+                "recommendations": [],
                 "confidence_score": 0.0,
-                "raw_llm_output": raw
+                "raw_llm_output": response
             }
 
         return {
